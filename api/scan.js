@@ -1,7 +1,9 @@
 import { db } from '../lib/clients.js';
 
 export default async function handler(req, res) {
-  if (req.headers['x-scan-key'] !== process.env.SCANNER_PASSWORD) return res.status(401).json({ status: 'denied' });
+  const expected = process.env.SCANNER_PASSWORD;
+  if (!expected || req.headers['x-scan-key'] !== expected)
+    return res.status(401).json({ status: 'denied', passwordSetOnServer: !!expected, serverPasswordLength: (expected || '').length, receivedLength: (req.headers['x-scan-key'] || '').length });
   const code = String(req.body?.code || '').trim();
   const { data: t } = await db.from('tickets').select('name, used_at').eq('code', code).maybeSingle();
   if (!t) return res.json({ status: 'invalid' });
