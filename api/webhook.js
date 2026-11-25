@@ -23,7 +23,7 @@ export default async function handler(req, res) {
   const rows = Array.from({ length: parseInt(s.metadata.qty) || 1 }, () => ({
     code: randomBytes(16).toString('hex'), session_id: s.id, name: s.metadata.name, email }));
   const { error } = await db.from('tickets').insert(rows);
-  if (error) return res.status(500).end();
+  if (error) { console.error('DB', error); return res.status(500).send('DB error: ' + error.message); }
 
   try {
     const attachments = await Promise.all(rows.map(async (r, i) => ({
@@ -37,10 +37,11 @@ export default async function handler(req, res) {
         ${rows.map((_, i) => `<p><img src="cid:t${i}" width="560" style="max-width:100%;height:auto" alt="Ticket ${i + 1}"></p>`).join('')}`,
       attachments,
     });
-  } catch {
+  } catch (e) {
     // Email failed: undo so Stripe retries the whole webhook.
+    console.error('MAIL', e);
     await db.from('tickets').delete().eq('session_id', s.id);
-    return res.status(500).end();
+    return res.status(500).send('Email or ticket error: ' + e.message);
   }
   res.json({ ok: true });
 }
