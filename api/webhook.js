@@ -41,7 +41,7 @@ export default async function handler(req, res) {
     // Email failed: undo so Stripe retries the whole webhook.
     console.error('MAIL', e);
     await db.from('tickets').delete().eq('session_id', s.id);
-    return res.status(500).send('Email or ticket error: ' + e.message + ' | user=' + process.env.GMAIL_USER + ' | passwordLength=' + (process.env.GMAIL_APP_PASSWORD || '').length);
+  return res.status(500).send('Email or ticket error');
   }
   res.json({ ok: true });
 }
