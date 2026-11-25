@@ -1,0 +1,47 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Ticket designer</title>
+<style>
+body{font:16px system-ui,sans-serif;margin:0;padding:16px;background:#0f1230;color:#f1ece0;max-width:900px}
+canvas{max-width:100%;touch-action:none;border-radius:8px;display:block;margin:12px 0;background:#000}
+label{display:block;margin:10px 0}input[type=range]{width:100%}
+textarea{width:100%;height:130px;font:13px monospace}code{color:#d8b26a}
+</style></head><body>
+<h1>Ticket designer</h1>
+<p>1. Choose your ticket image. 2. Drag the QR square and the name into place. 3. Copy the text at the bottom into
+<code>public/config.js</code> (replace the TICKET block). Save your image as <code>assets/ticket-template.png</code>.</p>
+<input type="file" id="f" accept="image/*">
+<canvas id="c" width="1400" height="560"></canvas>
+<label>QR size <input type="range" id="qs" min="80" max="700" value="320"></label>
+<label>Name size <input type="range" id="ns" min="16" max="160" value="56"></label>
+<label>Name maximum width <input type="range" id="nw" min="100" max="1800" value="820"></label>
+<label>Name colour <input type="color" id="nc" value="#f1ece0"></label>
+<textarea id="out" readonly onclick="this.select()"></textarea>
+<script>
+const $ = id => document.getElementById(id), v = id => +$(id).value, c = $('c'), x = c.getContext('2d');
+let img = null, qr = { x: 1020, y: 120 }, nm = { x: 70, y: 440 }, drag = null;
+$('f').onchange = e => {
+  const i = new Image();
+  i.onload = () => { img = i; c.width = i.width; c.height = i.height;
+    qr = { x: Math.round(i.width * .72), y: Math.round(i.height * .2) }; nm = { x: Math.round(i.width * .05), y: Math.round(i.height * .75) }; draw(); };
+  i.src = URL.createObjectURL(e.target.files[0]);
+};
+function draw() {
+  if (img) x.drawImage(img, 0, 0); else { x.fillStyle = '#23274f'; x.fillRect(0, 0, c.width, c.height); }
+  const s = v('qs'), fs = v('ns');
+  x.fillStyle = '#fff'; x.fillRect(qr.x, qr.y, s, s); x.strokeStyle = '#000'; x.lineWidth = 4; x.strokeRect(qr.x, qr.y, s, s);
+  x.fillStyle = '#000'; x.font = `bold ${s / 4 | 0}px sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('QR', qr.x + s / 2, qr.y + s / 2);
+  x.fillStyle = $('nc').value; x.font = `bold ${fs}px sans-serif`; x.textAlign = 'left'; x.textBaseline = 'top'; x.fillText('Alex Example', nm.x, nm.y, v('nw'));
+  $('out').value = `export const TICKET = {\n  qr:   { x: ${qr.x}, y: ${qr.y}, size: ${s} },\n  name: { x: ${nm.x}, y: ${nm.y}, size: ${fs}, maxWidth: ${v('nw')}, color: '${$('nc').value}' },\n};`;
+}
+const pos = e => { const r = c.getBoundingClientRect(), k = c.width / r.width; return { x: (e.clientX - r.left) * k, y: (e.clientY - r.top) * k }; };
+c.onpointerdown = e => {
+  const p = pos(e), s = v('qs');
+  if (p.x >= qr.x && p.x <= qr.x + s && p.y >= qr.y && p.y <= qr.y + s) drag = { o: qr, dx: p.x - qr.x, dy: p.y - qr.y };
+  else if (p.x >= nm.x && p.x <= nm.x + v('nw') && p.y >= nm.y && p.y <= nm.y + v('ns')) drag = { o: nm, dx: p.x - nm.x, dy: p.y - nm.y };
+  if (drag) c.setPointerCapture(e.pointerId);
+};
+c.onpointermove = e => { if (!drag) return; const p = pos(e); drag.o.x = Math.round(p.x - drag.dx); drag.o.y = Math.round(p.y - drag.dy); draw(); };
+c.onpointerup = () => drag = null;
+['qs', 'ns', 'nw', 'nc'].forEach(i => $(i).oninput = draw);
+draw();
+</script></body></html>

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tickets</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0f1230;--ink:#f1ece0;--mute:#a7a9c4;--gold:#d8b26a;--paper:#f1ece0;--navy:#14173a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.5 'DM Sans',system-ui,sans-serif;padding:clamp(20px,5vw,56px)}
+main{max-width:500px;margin:0 auto}
+h1{font:700 clamp(46px,14vw,80px)/.95 'Bodoni Moda',Georgia,serif;margin:.3em 0 .3em}
+.meta span{display:block;color:var(--mute)}
+.ticket{background:var(--paper);color:var(--navy);border-radius:14px;padding:22px 24px 26px;margin-top:32px}
+.top{display:flex;justify-content:space-between;align-items:baseline;font-weight:700}
+.top b{font:700 30px 'Bodoni Moda',Georgia,serif}
+.perf{position:relative;border-top:2px dashed #14173a40;margin:18px -24px 22px}
+.perf::before,.perf::after{content:"";position:absolute;top:-13px;width:24px;height:24px;border-radius:50%;background:var(--bg)}
+.perf::before{left:-12px}.perf::after{right:-12px}
+label{display:block;font-weight:500;margin-bottom:14px}
+input,select{display:block;width:100%;margin-top:4px;padding:12px;font:inherit;border:1.5px solid #14173a55;border-radius:8px;background:#fff;color:var(--navy)}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+button{width:100%;margin-top:6px;padding:15px;border:0;border-radius:10px;background:var(--navy);color:var(--paper);font:700 18px 'DM Sans',sans-serif;cursor:pointer}
+button:disabled{opacity:.6}
+#err{color:#a3201a;min-height:1.4em;margin:8px 0 0}
+.done{font-size:19px;margin:0}
+footer{margin-top:28px;color:var(--mute);font-size:14px}
+</style></head><body><main>
+<span id="school" class="meta"></span>
+<h1 id="title"></h1>
+<div class="meta"><span id="date"></span><span id="venue"></span></div>
+
+<div class="ticket" id="paid" hidden><p class="done"><b>Payment received.</b><br>Your tickets are on their way. Check your email, and your spam folder if nothing arrives within a few minutes.</p></div>
+
+<form class="ticket" id="form">
+  <div class="top"><span>Admit one</span><b id="price"></b></div>
+  <div class="perf"></div>
+  <label>Name<input id="name" required autocomplete="name" maxlength="100"></label>
+  <label>Email<input id="email" type="email" required autocomplete="email"></label>
+  <label>Tickets<select id="qty"></select></label>
+  <button id="go">Pay</button>
+  <p id="err" role="alert"></p>
+</form>
+<footer>Organiser: YOUR SCHOOL / ASSOCIATION, ADDRESS. <a href="/impressum.html" style="color:inherit">Impressum</a> and <a href="/datenschutz.html" style="color:inherit">Privacy</a></footer>
+</main>
+<script type="module">
+import { EVENT } from '/config.js';
+const $ = id => document.getElementById(id);
+const eur = c => (c / 100).toLocaleString('de-AT', { style: 'currency', currency: 'EUR' });
+document.title = `${EVENT.name} tickets`;
+$('title').textContent = EVENT.name; $('school').textContent = EVENT.school;
+$('date').textContent = EVENT.date; $('venue').textContent = EVENT.venue;
+for (let i = 1; i <= EVENT.maxPerOrder; i++) $('qty').add(new Option(i, i));
+const upd = () => { $('price').textContent = eur(EVENT.priceCents * $('qty').value); $('go').textContent = `Pay ${$('price').textContent}`; };
+$('qty').onchange = upd; upd();
+if (new URLSearchParams(location.search).has('paid')) { $('form').hidden = true; $('paid').hidden = false; }
+$('form').onsubmit = async e => {
+  e.preventDefault(); $('go').disabled = true; $('err').textContent = '';
+  try {
+    const r = await fetch('/api/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: $('name').value, email: $('email').value, qty: $('qty').value }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error);
+    location.href = d.url;
+  } catch (x) { $('err').textContent = x.message || 'Something went wrong. Please try again.'; $('go').disabled = false; }
+};
+</script></body></html>

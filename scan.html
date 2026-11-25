@@ -1,0 +1,50 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Entrance scanner</title>
+<style>
+body{margin:0;font:18px system-ui,sans-serif;background:#0f1230;color:#f1ece0;min-height:100vh;display:flex;flex-direction:column}
+#login,#app{padding:20px;display:flex;flex-direction:column;gap:14px}#app{display:none;flex:1}
+video{width:100%;max-height:45vh;object-fit:cover;border-radius:12px;background:#000}
+input,button{font:inherit;padding:14px;border-radius:10px;border:0}
+button{background:#d8b26a;color:#0f1230;font-weight:700}
+#res{flex:1;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;font-size:30px;font-weight:700;background:#23274f}
+#res small{font-size:18px;font-weight:400;margin-top:8px}
+#res.valid{background:#1f8a4c}#res.invalid,#res.denied{background:#b3261e}#res.used{background:#c77a00}
+</style></head><body>
+<form id="login"><h1>Entrance scanner</h1><input id="pw" type="password" placeholder="Scanner password" required><button>Start camera</button></form>
+<div id="app"><video id="v" playsinline muted></video><div id="res">Point the camera at a ticket</div></div>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script>
+const $ = id => document.getElementById(id), res = $('res'), v = $('v');
+let key = '', busy = false, last = '', lastAt = 0;
+const msg = {
+  valid: d => ['Valid', d.name], invalid: () => ['Invalid ticket', 'Not found'],
+  used: d => ['Already used', `${d.name}, scanned ${new Date(d.at).toLocaleTimeString('de-AT')}`],
+  denied: () => ['Not allowed', 'Wrong password or no connection'] };
+function show(s, d) {
+  const [t, sub] = (msg[s] || msg.denied)(d); res.className = s; res.textContent = t;
+  const e = document.createElement('small'); e.textContent = sub; res.append(e);
+}
+async function check(code) {
+  busy = true; last = code; lastAt = Date.now();
+  try {
+    const r = await fetch('/api/scan', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-scan-key': key }, body: JSON.stringify({ code }) });
+    const d = await r.json().catch(() => ({}));
+    show(r.status === 401 ? 'denied' : d.status, d);
+  } catch { show('denied', {}); }
+  setTimeout(() => busy = false, 1500);
+}
+async function start() {
+  v.srcObject = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+  await v.play(); $('login').style.display = 'none'; $('app').style.display = 'flex';
+  const c = document.createElement('canvas'), x = c.getContext('2d', { willReadFrequently: true });
+  (function tick() {
+    if (v.videoWidth && !busy) {
+      c.width = v.videoWidth; c.height = v.videoHeight; x.drawImage(v, 0, 0);
+      const q = jsQR(x.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
+      if (q && (q.data !== last || Date.now() - lastAt > 4000)) check(q.data);
+    }
+    requestAnimationFrame(tick);
+  })();
+}
+$('login').onsubmit = e => { e.preventDefault(); key = $('pw').value; start().catch(() => alert('Camera access is needed.')); };
+</script></body></html>
